@@ -20,6 +20,7 @@ import os
 import json
 import serial.tools.list_ports
 import signal
+import time
 look= Lock()
 
 data_array = deque(maxlen=1000)
@@ -59,6 +60,8 @@ class Serial_com:
                     trama = res[:-2].decode()
                     data = trama.split(",")
                     if len(data)==6 and flag_save:
+                        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%fZ')[:-3]
+                        data.insert(0,timestamp)
                         data_array.append(data)
                         frame.add_table(data)
                         self.counter = self.counter+1
@@ -73,9 +76,11 @@ class Serial_com:
             global flag_save
             if stop_threads: 
                 break            
-            if self.counter ==1000 and flag_save: 
+            if self.counter >=1000 and flag_save: 
                 self.counter = 0
                 data_save = deque(data_array)
+                # frame.text_msg
+                frame.text_msg.setText('Saving Data to file ...'+ frame.csv_name)
                 with open(frame.csv_name, 'a', newline='') as write_obj:    
                     # Create a writer object from csv module
                     csv_writer = writer(write_obj)
@@ -84,8 +89,10 @@ class Serial_com:
 
                     for i,x in enumerate(data_save):
                         # Add contents of list as last row in the csv file
-                        # x.insert(0,i+1000*self.iteration)
+                        x.insert(0,(i+1)+1000*self.iteration)
                         csv_writer.writerow(x)
+                self.iteration = self.iteration +1 
+                frame.text_msg.setText('Exporting file ...'+ frame.csv_name)
                 
 
 class Screen(QWidget):
@@ -94,6 +101,7 @@ class Screen(QWidget):
         self.port_selec=''
         self.baud_selec='115200'
         self.choices=[]
+        self.Serial = None
         self.path= os.path.abspath(os.getcwd())+'/csv/'
         grid = QGridLayout()
         self.setLayout(grid)        
@@ -203,8 +211,8 @@ class Screen(QWidget):
         self.box_rec = QGroupBox("Data")
         self.tableWidget = QTableWidget()
         self.tableWidget.setColumnCount(7)
-        self.tableWidget.setRowCount(1000)
-        self.tableWidget.setHorizontalHeaderLabels(['timestamp','1','2','3','4','5','6'])
+        # self.tableWidget.setRowCount(1000)
+        self.tableWidget.setHorizontalHeaderLabels(['timestamp','CH 1','CH 2','CH 3','CH 4','CH 5','CH 6'])
 
         self.tableWidget.horizontalHeader().setVisible(True)
         self.tableWidget.verticalHeader().setVisible(True)
@@ -260,18 +268,25 @@ class Screen(QWidget):
         global flag_save
         # ------------ Function for export data
         if self.rec_button.text()=='REC':
-            self.data_rec = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-            self.csv_name=self.pathLine.text()+self.data_rec+'.csv'
-            self.text_msg.setText('Exporting file ...'+ self.csv_name)
+            self.data_rec = datetime.timestamp(datetime.now())
+            # self.data_rec = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+            self.csv_name=self.pathLine.text()+str(self.data_rec)+'.csv'
+            self.text_msg.setText('Collectind Data')
             flag_save = True
             self.rec_button.setText('STOP')
+            # self.tableWidget.clear()
             self.rec_button.setIcon(QIcon('assets/stop.jpeg'))
+            if self.tableWidget.rowCount()>0:
+                self.tableWidget.setRowCount(0)
+
         else:
             self.text_msg.setText('Stop')
             self.rec_button.setText('REC')        
             self.rec_button.setIcon(QIcon('assets/record-16.png'))
             flag_save = False
-
+            if self.Serial:
+                self.Serial.counter = 0
+                self.Serial.iteration = 0
     # List COM availables 
     def List_port(self):
         self.port.clear()
@@ -304,12 +319,11 @@ class Screen(QWidget):
 
 
     def add_table(self, data_array):
+        if self.tableWidget.rowCount()==1:
+            self.tableWidget.resizeColumnsToContents()
         row = self.tableWidget.rowCount()
         self.tableWidget.setRowCount(row+1)
-        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-        cell = QTableWidgetItem(timestamp)
-        item = self.tableWidget.setItem(row, 0, cell)
-        col = 1
+        col = 0
         for item in data_array:
             cell = QTableWidgetItem(str(item))
             item =self.tableWidget.setItem(row, col, cell)
