@@ -319,8 +319,8 @@ class Screen(QWidget):
 
 
     def add_table(self, data_array):
-        if self.tableWidget.rowCount()==1:
-            self.tableWidget.resizeColumnsToContents()
+        # if self.tableWidget.rowCount()==1:
+        #     self.tableWidget.resizeColumnsToContents()
         row = self.tableWidget.rowCount()
         self.tableWidget.setRowCount(row+1)
         col = 0
