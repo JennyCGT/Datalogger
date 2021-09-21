@@ -85,7 +85,7 @@ class Serial_com:
                     # Create a writer object from csv module
                     csv_writer = writer(write_obj)
                     if self.iteration ==0:
-                        csv_writer.writerow(['','Date Time','Channel1','Channel2','Channel3','Channel4','Channel5','Channel6','Channel7','Channel8'])
+                        csv_writer.writerow(['','Date Time','Channel1','Channel2','Channel3','Channel4','Channel5','Channel6'])
 
                     for i,x in enumerate(data_save):
                         # Add contents of list as last row in the csv file
@@ -187,8 +187,7 @@ class Screen(QWidget):
 
     def table_settings(self):
         self.box_rec = QGroupBox("Table Settings")
-        self.listCheckBox = ["Channel_1", "Channel_2", "Channel_3", "Channel_4", "Channel_5",
-                             "Channel_6"]
+        self.listCheckBox = ["Channel_1", "Channel_2", "Channel_3", "Channel_4", "Channel_5","Channel_6"]
         self.listLabel    = ['', '', '', '', '', '', '', '', '', '', ] 
         grid = QGridLayout()
         for i, v in enumerate(self.listCheckBox):
