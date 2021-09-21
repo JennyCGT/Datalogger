@@ -27,7 +27,7 @@ data_array = deque(maxlen=1000)
 stop_threads = True
 stop_threads_1 = True 
 flag_save = False
-
+frame = ''
 with open ('settings.json') as _file:
     settings = json.loads(_file.read())
 
@@ -133,6 +133,9 @@ class Screen(QWidget):
         self.ports = list(serial.tools.list_ports.comports())
         for i in self.ports:
             self.port.addItem(i.device)
+        print("fdcghvhjnk", self.port_selec)
+        self.port.setCurrentText(self.port_selec)
+        
         self.port.activated.connect(self.selec_port)
 
         text_baud = QLabel("Baudrate")
@@ -361,10 +364,14 @@ class Screen(QWidget):
         self.pathLine.setText(self.path)
 
     
-if __name__ == '__main__':
+def main():
+    global stop_threads, flag_save, frame
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     app = QApplication([])
     frame = Screen()
     app.exec_()
     stop_threads = True 
     flag_save = False
+
+if __name__ == '__main__':
+    main()
