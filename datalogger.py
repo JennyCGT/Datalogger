@@ -1,4 +1,6 @@
+import pathlib
 from typing import Counter
+from pathlib import Path
 from PyQt5 import QtCore
 from PyQt5 import QtWidgets
 from PyQt5 import QtGui
@@ -28,8 +30,6 @@ stop_threads = True
 stop_threads_1 = True 
 flag_save = False
 frame = ''
-with open ('settings.json') as _file:
-    settings = json.loads(_file.read())
 
 class Serial_com:
     def __init__(self, port, baud):
@@ -102,7 +102,7 @@ class Screen(QWidget):
         self.baud_selec='115200'
         self.choices=[]
         self.Serial = None
-        self.path= os.path.abspath(os.getcwd())+'/csv/'
+        self.path= os.path.join(os.path.abspath(os.getcwd()),'csv/')
         grid = QGridLayout()
         self.setLayout(grid)        
         grid.addWidget(self.serial_settings(), 0, 0,1,1)
@@ -124,16 +124,11 @@ class Screen(QWidget):
         self.box_serial = QGroupBox("Serial Settings")
         text_port = QLabel("Port")        
         self.port = QComboBox()
-        if(settings['port'] == ""):
-            self.port_selec =""
-            self.port.addItem("Choose a Port")
-        else:
-            self.port_selec = settings['port']
+        self.port.addItem("Choose a Port")
 
         self.ports = list(serial.tools.list_ports.comports())
         for i in self.ports:
             self.port.addItem(i.device)
-        print("fdcghvhjnk", self.port_selec)
         self.port.setCurrentText(self.port_selec)
         
         self.port.activated.connect(self.selec_port)
@@ -257,11 +252,11 @@ class Screen(QWidget):
         return self.box_msg
 
 #---------------------- FUNCTIONS -------------------------------------------------
-    def showDialog(self):
+    def showDialog(self, text):
         msgBox = QMessageBox()
         msgBox.setIcon(QMessageBox.Information)
         msgBox.setWindowTitle("Alert")
-        msgBox.setText("Choose a valid port")
+        msgBox.setText(text)
         msgBox.setStandardButtons(QMessageBox.Ok )
 
         returnValue = msgBox.exec()
@@ -303,9 +298,6 @@ class Screen(QWidget):
     # Get Port Selected 
     def selec_port(self,text):
         self.port_selec = self.port.itemText(text)
-        settings['port']= self.port_selec
-        with open ('settings.json','w') as _file:
-            json.dump(settings,_file)
     
     def stateSlot(self):
         for i, v in enumerate(self.listCheckBox):
@@ -338,17 +330,21 @@ class Screen(QWidget):
         # Detect if the port was selected
         if self.connect_button.text()=='Connect':
             if(self.port_selec == '' or self.port_selec == 'Choose a port'):
-                self.showDialog()
+                self.showDialog("Choose a valid port")
             else:
                 # Start Serial protocol
                 self.connect_button.setText('Disconnect')
                 stop_threads = False
-                self.Serial=Serial_com(self.port_selec,self.baud_selec)
-                self.ser_msg.setText("Open")
-                # Disable the options for port and baudrate
-                self.port.setDisabled(True)
-                self.baud.setDisabled(True)  
-                self.pathLine.setDisabled(True)
+                try:
+                    self.Serial=Serial_com(self.port_selec,self.baud_selec)                    
+                    self.ser_msg.setText("Open")
+                    # Disable the options for port and baudrate
+                    self.port.setDisabled(True)
+                    self.baud.setDisabled(True)  
+                    self.pathLine.setDisabled(True)
+                except Exception :
+                    self.showDialog("Could not open selected port \n\n Please try again")
+
         else:
             self.connect_button.setText('Connect')
             stop_threads = True
@@ -357,9 +353,10 @@ class Screen(QWidget):
             self.baud.setDisabled(False)
 
     def onBrowser(self,event):
-        self.path = QFileDialog.getExistingDirectory(self, 'Choose a Directory')
-        if not self.path:
-            self.path= os.path.abspath(os.getcwd())
+        path = QFileDialog.getExistingDirectory(self, 'Choose a Directory')
+        if  self.path  != path and path is not None and path!="":
+            self.path= path
+            
         self.pathLine.setText(self.path)
 
     
