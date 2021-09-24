@@ -1,4 +1,6 @@
 import pathlib
+from itertools import islice
+import sys
 from typing import Counter
 from pathlib import Path
 from PyQt5 import QtCore
@@ -94,6 +96,35 @@ class Serial_com:
                 self.iteration = self.iteration +1 
                 frame.text_msg.setText('Exporting file ...'+ frame.csv_name)
                 
+    def record_on_fail(self):
+        new_slice = islice(data_array,len(data_array)- self.counter , len(data_array))
+        data_save = deque(new_slice)
+        frame.text_msg.setText('Saving Data to file ...'+ frame.csv_name)
+        with open(frame.csv_name, 'a', newline='') as write_obj:    
+            # Create a writer object from csv module
+            csv_writer = writer(write_obj)
+            if self.iteration ==0:
+                csv_writer.writerow(['','Date Time','Channel1','Channel2','Channel3','Channel4','Channel5','Channel6'])
+
+            for i,x in enumerate(data_save):
+                # Add contents of list as last row in the csv file
+                x.insert(0,(i+1)+1000*self.iteration)
+                csv_writer.writerow(x)
+        self.iteration = self.iteration +1 
+        frame.text_msg.setText('Exporting file ...'+ frame.csv_name)
+
+
+    def record_on_exit(self):
+        new_slice = islice(data_array,len(data_array)- self.counter , len(data_array))
+        data_save = deque(new_slice)
+        # with open(frame.csv_name, 'a', newline='') as write_obj:    
+        #     csv_writer = writer(write_obj)
+        #     if self.iteration ==0:
+        #         csv_writer.writerow(['','Date Time','Channel1','Channel2','Channel3','Channel4','Channel5','Channel6'])
+
+        #     for i,x in enumerate(data_save):
+        #         x.insert(0,(i+1)+1000*self.iteration)
+        #         csv_writer.writerow(x)
 
 class Screen(QWidget):
     def __init__(self, parent = None):
@@ -109,13 +140,11 @@ class Screen(QWidget):
         grid.addWidget(self.record_settings(), 1, 0,1,1)
         grid.addWidget(self.table_settings(),2,0,1,1)
         grid.addWidget(self.message(),3,0,1,2)
-        # grid.setColumnStretch(0,0 )
         grid.addWidget(self.table_data(), 0, 1,3,1)
         grid.setColumnStretch(1,5)        
         self.setLayout(grid)
         self.setWindowTitle('Datalogger')
         self.resize(1200,600)
-        self.show()
         self.setAttribute(Qt.WA_DeleteOnClose)
 
 
@@ -208,15 +237,10 @@ class Screen(QWidget):
         self.box_rec = QGroupBox("Data")
         self.tableWidget = QTableWidget()
         self.tableWidget.setColumnCount(7)
-        # self.tableWidget.setRowCount(1000)
         self.tableWidget.setHorizontalHeaderLabels(['timestamp','CH 1','CH 2','CH 3','CH 4','CH 5','CH 6'])
 
         self.tableWidget.horizontalHeader().setVisible(True)
         self.tableWidget.verticalHeader().setVisible(True)
-        # self.tableWidget.resizeColumnsToContents()
-        # self.tableWidget.rowsInserted.connect(self.auto_scroll_method)
-        # self.tableWidget.columnCountChanged.connect(self.auto_scroll_method)
-        # self.tableWidget.verticalScrollBar().valueChanged.connect(self.auto_scroll_method)
         b1 = QHBoxLayout()
         b1.addWidget(self.tableWidget)
         self.box_rec.setLayout(b1)
@@ -251,7 +275,7 @@ class Screen(QWidget):
         self.box_msg.setLayout (b1)
         return self.box_msg
 
-#---------------------- FUNCTIONS -------------------------------------------------
+    #---------------------- FUNCTIONS -------------------------------------------------
     def showDialog(self, text):
         msgBox = QMessageBox()
         msgBox.setIcon(QMessageBox.Information)
@@ -281,6 +305,7 @@ class Screen(QWidget):
             self.rec_button.setText('REC')        
             self.rec_button.setIcon(QIcon('assets/record-16.png'))
             flag_save = False
+            self.Serial.record_on_fail()
             if self.Serial:
                 self.Serial.counter = 0
                 self.Serial.iteration = 0
@@ -359,15 +384,32 @@ class Screen(QWidget):
             
         self.pathLine.setText(self.path)
 
+    def closeEvent(self, event):
+
+        quit_msg = "Are you sure you want to exit the program?"
+        reply = QMessageBox.question(self, 'Message', 
+                        quit_msg, QMessageBox.Yes, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            global stop_threads, flag_save
+            self.Serial.record_on_exit()
+            stop_threads = True 
+            flag_save = False
+            event.accept()
+        else:
+            event.ignore()
+
     
 def main():
     global stop_threads, flag_save, frame
     signal.signal(signal.SIGINT, signal.SIG_DFL)
-    app = QApplication([])
+    app = QApplication(sys.argv)
     frame = Screen()
-    app.exec_()
+    frame.show()
+    # app.exec_()
     stop_threads = True 
     flag_save = False
+    sys.exit(app.exec_())
 
 if __name__ == '__main__':
     main()
