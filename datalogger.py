@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
         QVBoxLayout, QWidget,QMessageBox)
 from PyQt5.QtGui import QFont, QIcon
 from datetime import datetime
-from csv import writer
+from csv import writer, reader
 # import serial
 import functools
 import os
@@ -26,7 +26,7 @@ import serial.tools.list_ports
 import signal
 import time
 look= Lock()
-
+init_row = 0
 data_array = deque(maxlen=1000)
 stop_threads = True
 stop_threads_1 = True 
@@ -41,7 +41,8 @@ class Serial_com:
         bytesize=serial.EIGHTBITS,\
         timeout=(0.1))
         self.counter = 0 
-        self.iteration = 0       
+        self.iteration = 0
+        self.init_counter = 0       
         # Thread for reading serial Port
         self.t1 = Thread(target = self.loop)
         self.t1.start()
@@ -75,7 +76,7 @@ class Serial_com:
 
     def record(self):
         while True:
-            global flag_save
+            global flag_save, init_row
             if stop_threads: 
                 break            
             if self.counter >=1000 and flag_save: 
@@ -83,40 +84,42 @@ class Serial_com:
                 data_save = deque(data_array)
                 # frame.text_msg
                 frame.text_msg.setText('Saving Data to file ...'+ frame.csv_name)
-                with open(frame.csv_name, 'a', newline='') as write_obj:    
+                with open(frame.csv_name, 'a+', newline='') as write_obj:    
                     # Create a writer object from csv module
                     csv_writer = writer(write_obj)
-                    if self.iteration ==0:
+                    if self.iteration ==0 and init_row < 1:
                         csv_writer.writerow(['','Date Time','Channel1','Channel2','Channel3','Channel4','Channel5','Channel6'])
-
                     for i,x in enumerate(data_save):
                         # Add contents of list as last row in the csv file
-                        x.insert(0,(i+1)+1000*self.iteration)
+                        x.insert(0,(i+1+init_row)+1000*self.iteration)
                         csv_writer.writerow(x)
                 self.iteration = self.iteration +1 
                 frame.text_msg.setText('Exporting file ...'+ frame.csv_name)
                 
     def record_on_fail(self):
+        global init_row
         new_slice = islice(data_array,len(data_array)- self.counter , len(data_array))
         data_save = deque(new_slice)
         frame.text_msg.setText('Saving Data to file ...'+ frame.csv_name)
         with open(frame.csv_name, 'a', newline='') as write_obj:    
             # Create a writer object from csv module
             csv_writer = writer(write_obj)
-            if self.iteration ==0:
+            if self.iteration ==0 and init_row < 1:
                 csv_writer.writerow(['','Date Time','Channel1','Channel2','Channel3','Channel4','Channel5','Channel6'])
 
             for i,x in enumerate(data_save):
                 # Add contents of list as last row in the csv file
-                x.insert(0,(i+1)+1000*self.iteration)
+                x.insert(0,(i+1+init_row)+1000*self.iteration)
                 csv_writer.writerow(x)
+            init_row = init_row + len(data_save) 
         self.iteration = self.iteration +1 
         frame.text_msg.setText('Exporting file ...'+ frame.csv_name)
 
 
     def record_on_exit(self):
-        new_slice = islice(data_array,len(data_array)- self.counter , len(data_array))
-        data_save = deque(new_slice)
+        if len(data_array)!=0:
+            new_slice = islice(data_array,len(data_array)- self.counter , len(data_array))
+            data_save = deque(new_slice)
         # with open(frame.csv_name, 'a', newline='') as write_obj:    
         #     csv_writer = writer(write_obj)
         #     if self.iteration ==0:
@@ -125,6 +128,7 @@ class Serial_com:
         #     for i,x in enumerate(data_save):
         #         x.insert(0,(i+1)+1000*self.iteration)
         #         csv_writer.writerow(x)
+
 
 class Screen(QWidget):
     def __init__(self, parent = None):
@@ -188,20 +192,33 @@ class Screen(QWidget):
         self.box_rec = QGroupBox("Record/Export")
         browse_text = QLabel("Folder Data")
         self.pathLine = QLineEdit(self.path)
-        self.browse_button = QPushButton()
-        self.browse_button.clicked.connect(self.onBrowser)
-        self.browse_button.setIcon(QIcon('assets/windows.jpeg'))
+        self.new_file_button = QPushButton('New File')
+        self.new_file_button.setIcon(QIcon('assets/windows.jpeg'))
+        self.new_file_button.clicked.connect(self.onBrowser)
+        self.edit_button = QPushButton('Edit')
+        self.edit_button.setIcon(QIcon('assets/windows.jpeg'))
+        self.edit_button.clicked.connect(self.onFiles)
+        # self.browse_button = QPushButton()
+        # self.browse_button.clicked.connect(self.onBrowser)
+        # self.browse_button.setIcon(QIcon('assets/windows.jpeg'))
         self.rec_button = QPushButton('REC') 
         self.rec_button.clicked.connect(self.onRec)
         self.rec_button.setIcon(QIcon('assets/record-16.png'))
 
+        b3 = QHBoxLayout()
+        b3.addWidget(self.new_file_button)
+        b3.addWidget(self.edit_button)
+
         b2 = QHBoxLayout()
         b2.addWidget(self.pathLine)
-        b2.addWidget(self.browse_button)
+        # b2.addWidget(self.browse_button)
 
         b1 = QVBoxLayout()
         b1.addWidget(browse_text)
-        b1.addLayout(b2)
+        b1.addLayout(b3)
+        b1.addStretch(1)
+        b1.addWidget(self.pathLine)
+        # b1.addLayout(b2)
         b1.addStretch(1)
         b1.addWidget(self.rec_button)
 
@@ -291,11 +308,19 @@ class Screen(QWidget):
         if self.rec_button.text()=='REC':
             self.data_rec = datetime.timestamp(datetime.now())
             # self.data_rec = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-            self.csv_name=self.pathLine.text()+str(self.data_rec)+'.csv'
+            if '.csv' in self.pathLine.text():
+                self.csv_name=self.pathLine.text()
+            else:
+                name = str(self.data_rec)+'.csv'
+                print(os.path.join(self.pathLine.text(),"", name))
+                self.csv_name= os.path.join(self.pathLine.text(),"", name)
+
             self.text_msg.setText('Collectind Data')
             flag_save = True
             self.rec_button.setText('STOP')
             # self.tableWidget.clear()
+            self.new_file_button.setDisabled(True)
+            self.edit_button.setDisabled(True)
             self.rec_button.setIcon(QIcon('assets/stop.jpeg'))
             if self.tableWidget.rowCount()>0:
                 self.tableWidget.setRowCount(0)
@@ -304,6 +329,8 @@ class Screen(QWidget):
             self.text_msg.setText('Stop')
             self.rec_button.setText('REC')        
             self.rec_button.setIcon(QIcon('assets/record-16.png'))
+            self.new_file_button.setDisabled(False)
+            self.edit_button.setDisabled(False)
             flag_save = False
             self.Serial.record_on_fail()
             if self.Serial:
@@ -380,8 +407,21 @@ class Screen(QWidget):
     def onBrowser(self,event):
         path = QFileDialog.getExistingDirectory(self, 'Choose a Directory')
         if  self.path  != path and path is not None and path!="":
+            self.path= os.path.abspath(path)
+        if self.Serial:
+            self.Serial.iteration=0
+        global init_row
+        init_row = 0
+        self.pathLine.setText(self.path)
+
+    def onFiles(self,event):
+        global init_row
+        path,__ = QFileDialog.getOpenFileName(self, 'Choose a File')
+        if  self.path  != path and path is not None and path!="":
             self.path= path
-            
+            with open(self.path, 'r', newline='') as read_obj:    
+                a =  read_obj.readlines()
+                init_row = len(a)-1
         self.pathLine.setText(self.path)
 
     def closeEvent(self, event):
