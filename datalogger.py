@@ -217,8 +217,9 @@ class Screen(QWidget):
         b1.addWidget(browse_text)
         b1.addLayout(b3)
         b1.addStretch(1)
+        b1.addWidget(QLabel("Check path before recording"))
         b1.addWidget(self.pathLine)
-        # b1.addLayout(b2)
+        b1.addStretch(1)
         b1.addStretch(1)
         b1.addWidget(self.rec_button)
 
